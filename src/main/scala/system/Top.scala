@@ -3,13 +3,14 @@ package system
 import chisel3._
 import chisel3.util._
 import chisel3.experimental.Analog
-import sound.Mcp49xxSpiOutputBundle
-import sound.SoundController
+
+import blackbox._
+import uart._
 
 
 
 
-class Top(addressWidth: Int = 14, clockFreq: Int) extends Module {
+class Top(addressWidth: Int = 14, clockFreq: Int) extends RawModule {
   val io = IO(new Bundle{
     val address = Input(UInt(addressWidth.W))
     val data = Analog(8.W)
@@ -18,33 +19,59 @@ class Top(addressWidth: Int = 14, clockFreq: Int) extends Module {
     val irqB = Output(Bool())
     val resB = Output(Bool())
     val ph0In = Output(Bool())
-    val soundSpiOut = Output(new Mcp49xxSpiOutputBundle)
+
+    val clk12 = Input(Clock())
+    val reset = Input(Bool())
+
+    val uartTx = Output(Bool())
+    val uartRx = Input(Bool())
   })
-  val soundController = Module(new SoundController(clockFreq = clockFreq))
-  io.soundSpiOut := soundController.io.spi_out
 
-  val clockGen = Module(new ClockGen(clockFreq, clockFreq/2))
-  io.ph0In := clockGen.io.ph0In
+  val pll = Module(new LatticePLL)
+  pll.io.CLKI := io.clk12
+  
 
-  val dataBusInOut = Module(new DataBusInOut)
-  dataBusInOut.io.dataio <> io.data
-  dataBusInOut.io.oe := true.B // TODO
-  dataBusInOut.io.datain := 0xEA.U
+  val dataBus = Module(new DataBus)
 
-  //TODO section
-  io.irqB := true.B
-  io.resB := true.B
+  val writeOut = Wire(Bool())
+
+  writeOut := !io.selB && io.readWriteB
+
+
+  dataBus.io.dataio <> io.data
+  dataBus.io.oe := writeOut 
+
+  withClockAndReset(pll.io.CLKOP, !io.reset){
+    val clockGen = Module(new ClockGen(clockFreq, clockFreq/32))
+    val signalRouter = Module(new SignalRouter(addressWidth, clockFreq))
+
+    io.ph0In := clockGen.io.ph0In
+
+    signalRouter.io.bundle.address := io.address
+    signalRouter.io.bundle.selB := io.selB
+    signalRouter.io.bundle.readWriteB := io.readWriteB
+    signalRouter.io.bundle.dataIn := dataBus.io.dataout
+    dataBus.io.datain := signalRouter.io.bundle.dataOut
+    signalRouter.io.bundle.act := clockGen.io.act
+    io.irqB := signalRouter.io.irqB
+    io.uartTx := signalRouter.io.uartTx
+    signalRouter.io.uartClock := pll.io.CLKOP
+    signalRouter.io.uartRx := io.uartRx
+
+    io.resB := !io.reset
+  }
+
 }
 
 object Top extends App {
   chisel3.Driver.execute(args, () => new Top(clockFreq=12000000))
 }
 
-class DataBusInOut extends BlackBox with HasBlackBoxInline {
+class DataBus extends BlackBox with HasBlackBoxInline {
   val io = IO(new Bundle {
-    val datain = Input(UInt(8.W))
-    val dataout = Output(UInt(8.W))
+    val dataout = Output(UInt(8.W))    
     val dataio = Analog(8.W)
+    val datain = Input(UInt(8.W))
     val oe = Input(Bool())
   })
   setInline("DataBus.v",
@@ -53,10 +80,14 @@ class DataBusInOut extends BlackBox with HasBlackBoxInline {
     |     output [7:0] dataout,
     |     inout [7:0] dataio,
     |     input [7:0] datain,
-    |     input oen);
+    |     input oe);
     |
-    |   assign dataio = (oen == 'b0) ? datain : 'bzzzzzzzz;
+    |   
+    |   
+    |   assign dataio = oe ? datain : 8'bz;
     |   assign dataout = dataio;
+    |   
+    |   
     |endmodule
     """.stripMargin
   )

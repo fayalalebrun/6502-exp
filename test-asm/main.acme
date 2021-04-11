@@ -1,0 +1,22 @@
+!cpu w65c02
+!to "main.o", plain
+	
+	*= 0x8000
+.start:
+	ldx #0
+	jmp +
+-		sta $4000
+		inx
++		lda .string, x
+		bne -	
+-	lda $4000
+	cmp #$FF
+	beq -
+		sta $4000
+		jmp -
+
+.string !raw "Hello from the 6502!", $0d, $0a, 0
+
+*= 0xFFFC
+!16 .start
+!align 0x10000, 0x10000
