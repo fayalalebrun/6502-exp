@@ -20,8 +20,8 @@ class UartDriverTest extends FreeSpec with ChiselScalatestTester {
       dut.io.routerBundle.address.poke(0x00.U)
       dut.io.routerBundle.dataIn.poke(0x55.U)
       dut.clock.step(1)
-      dut.io.tx_data.valid.expect(true.B)
-      dut.io.tx_data.bits.expect(0x55.U)
+      dut.io.txData.valid.expect(true.B)
+      dut.io.txData.bits.expect(0x55.U)
       dut.clock.step(1)
     }
   }

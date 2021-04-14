@@ -26,27 +26,30 @@ class UartDriver(addressWidth: Int) extends Module {
   enable_write := false.B
 
   val txDataOut = Reg(UInt(8.W))
-  val rxDataOut = RegInit(0xFF.U)
+  val dataOut = RegInit(0xFF.U(8.W))
 
-  io.routerBundle.dataOut := rxDataOut
+  io.routerBundle.dataOut := dataOut
 
   when (!io.routerBundle.selB&&io.routerBundle.act){
     when(!io.routerBundle.readWriteB){
       switch(io.routerBundle.address){
-        is(0x0.U){
+        is(0x0.U){ // Data Register - Write
           txDataOut := io.routerBundle.dataIn
           enable_write := true.B
-        }        
+        }
       }
     }.otherwise {
       switch(io.routerBundle.address){
-        is(0x0.U){
+        is(0x0.U){ // Data register - Read
           when(io.rxData.valid) {
             io.rxData.ready := true.B
-            rxDataOut := io.rxData.bits
+            dataOut := io.rxData.bits
           }.otherwise {
-            rxDataOut := 0xFF.U
+            dataOut := 0xFF.U
           }
+        }
+        is(0x1.U){ // Status register - Read
+          dataOut := Cat(Seq(Fill(3,false.B),io.txData.ready,io.rxData.valid,  Fill(3,false.B)))
         }
       }
     }

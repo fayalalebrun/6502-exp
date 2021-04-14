@@ -18,23 +18,16 @@ class UartModule(addressWidth: Int) extends Module{
 
 
   val txQueue = Module(new Queue(UInt(), 32))
-  val rs232Tx = Module(new rs232_tx)
+  val uartTx = Module(new Tx(36000000, 115200))
 
-  rs232Tx.io.clk := clock
-  rs232Tx.io.rst := reset.asBool()
-  io.tx := rs232Tx.io.tx
-  rs232Tx.io.fifo_empty := !txQueue.io.deq.valid
-  txQueue.io.deq.ready := rs232Tx.io.fifo_RdEn
-  rs232Tx.io.fifo_data := txQueue.io.deq.bits
+  io.tx := uartTx.io.txd
+  txQueue.io.deq <> uartTx.io.channel
+
 
   val rxQueue = Module(new Queue(UInt(), 32))
-  val rs232Rx = Module(new rs232_rx)
-  rs232Rx.io.clk := clock
-  rs232Rx.io.rst := reset.asBool()
-  rs232Rx.io.rx := io.rx
-  rs232Rx.io.fifo_full := !rxQueue.io.enq.ready
-  rxQueue.io.enq.valid := rs232Rx.io.fifo_WrEn
-  rxQueue.io.enq.bits := rs232Rx.io.fifo_data
+  val uartRx = Module(new Rx(36000000, 115200))
+  uartRx.io.rxd := io.rx
+  uartRx.io.channel <> rxQueue.io.enq
   
   uartDriver.io.routerBundle <> io.routerBundle
   uartDriver.io.txData <> txQueue.io.enq

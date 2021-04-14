@@ -25,6 +25,9 @@ class Top(addressWidth: Int = 14, clockFreq: Int) extends RawModule {
 
     val uartTx = Output(Bool())
     val uartRx = Input(Bool())
+
+    val singleClockToggle = Input(Bool())
+    val singleClockTrigger = Input(Bool())
   })
 
   val pll = Module(new LatticePLL)
@@ -42,10 +45,12 @@ class Top(addressWidth: Int = 14, clockFreq: Int) extends RawModule {
   dataBus.io.oe := writeOut 
 
   withClockAndReset(pll.io.CLKOP, !io.reset){
-    val clockGen = Module(new ClockGen(clockFreq, clockFreq/32))
+    val clockGen = Module(new ClockGen(36))
     val signalRouter = Module(new SignalRouter(addressWidth, clockFreq))
 
     io.ph0In := clockGen.io.ph0In
+    clockGen.io.singleClock := io.singleClockToggle
+    clockGen.io.singleClockSignal := !io.singleClockTrigger // Button pressed = logic level 0
 
     signalRouter.io.bundle.address := io.address
     signalRouter.io.bundle.selB := io.selB
@@ -64,7 +69,7 @@ class Top(addressWidth: Int = 14, clockFreq: Int) extends RawModule {
 }
 
 object Top extends App {
-  chisel3.Driver.execute(args, () => new Top(clockFreq=12000000))
+  chisel3.Driver.execute(args, () => new Top(clockFreq=36000000))
 }
 
 class DataBus extends BlackBox with HasBlackBoxInline {

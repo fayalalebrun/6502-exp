@@ -2,29 +2,43 @@ package system
 
 import chisel3._
 import chisel3.util._
+import chisel3.experimental.chiselName
 
-class ClockGen(clockFreq: Int, desiredFreq: Int) extends Module{
+@chiselName
+class ClockGen(dividerValue: Int) extends Module{
   val io = IO(new Bundle{
     val ph0In = Output(Bool())
     val act = Output(Bool())
+    val singleClock = Input(Bool())
+    val singleClockSignal = Input(Bool())
   });
-  val dividerVal = (clockFreq/(desiredFreq*2))
-  require(clockFreq>=desiredFreq*4)
-  require(clockFreq%dividerVal==0)
-  
 
-  val ph0In = RegInit(true.B)
+  require(dividerValue%2==0)
+  require(dividerValue>0)
 
-  val dividerCounter = new Counter(dividerVal)
+  val ph0In = RegInit(false.B)
 
-  when(dividerCounter.inc()){
-    ph0In := !ph0In
+  val dividerCounter = new Counter(dividerValue/2)
+
+  val singleClockPressed = RegInit(false.B)
+  val singleClockAct = RegInit(false.B)//Wire(Bool())
+
+  singleClockAct := io.singleClockSignal && !singleClockPressed && !ph0In // Only trigger on the positive edge
+
+  when(!io.singleClock){
+    when(dividerCounter.inc()){
+      ph0In := !ph0In
+    }
+  }.otherwise {    
+    when(io.singleClockSignal && !singleClockPressed){      
+      ph0In := !ph0In
+      singleClockPressed := true.B      
+    }.elsewhen(!io.singleClockSignal && singleClockPressed){
+      singleClockPressed := false.B
+    }
   }
 
 
   io.ph0In := ph0In
-  io.act := false.B
-  when(dividerCounter.value === 0.U && ph0In === true.B){
-    io.act := true.B
-  }
+  io.act := ((dividerCounter.value === 0.U) && ph0In && !io.singleClock) || singleClockAct
 }
