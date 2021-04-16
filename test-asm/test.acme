@@ -1,0 +1,50 @@
+!cpu w65c02
+!to "main.o", plain
+
+	
+	*= 0x8000
+.start:
+	ldx #$FF
+	txs
+	lda #$55
+	sta $03
+	lda #$00
+	lda $03
+	cmp #$55
+	bne .printb
+	ldx #$0
+	jmp +
+-		sta $4000
+		inx
++		lda .string2, x
+		bne -	
+-	lda $4001
+	bit #$08
+	beq -		
+		lda $4000
+		pha
+		pla
+		sta $4000
+		jmp -
+.string2 !raw "All good", $0d, $0a, 0
+		
+.printb:ldx #0
+	jmp +
+-		sta $4000
+		inx
++		lda .string, x
+		bne -	
+-	lda $4001
+	bit #$08
+	beq -
+		lda $4000
+		sta $2000
+		lda $2000
+		sta $400
+		jmp -
+
+.string !raw "Stack error detected", $0d, $0a, 0
+
+*= 0xFFFC
+!16 .start
+!align 0x10000, 0x10000

@@ -1,17 +1,19 @@
 !cpu w65c02
 !to "main.o", plain
+
 	
 	*= 0x8000
-.start:
+.start:--
 	ldx #0
 	jmp +
 -		sta $4000
 		inx
 +		lda .string, x
 		bne -	
--	lda $4000
-	cmp #$FF
+-	lda $4001
+	bit #$08
 	beq -
+		lda $4000
 		sta $4000
 		jmp -
 
@@ -20,3 +22,5 @@
 *= 0xFFFC
 !16 .start
 !align 0x10000, 0x10000
+
+	
